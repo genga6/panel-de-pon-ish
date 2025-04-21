@@ -1,11 +1,11 @@
 services:
-  my-llm-chat-ui:
+  panel-de-pon-ish:
     build:
       context: ../
       dockerfile: ./.devcontainer/dev.Dockerfile
     env_file:
       - ../.env
     volumes:
-      - ..:/workspaces/my-llm-chat-ui:cached
+      - ..:/workspaces/panel-de-pon-ish:cached
     environment:
       - NODE_ENV=development
