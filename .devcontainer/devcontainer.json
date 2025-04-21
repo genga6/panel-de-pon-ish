@@ -1,0 +1,28 @@
+{
+	"name": "panel-de-pon-ish",
+	"dockerComposeFile": ["docker-compose.yaml"],
+  "service": "panel-de-pon-ish",
+	"workspaceFolder": "/workspaces/panel-de-pon-ish",
+	"overrideCommand": true,
+	"customizations": {
+		"vscode": {
+			"extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "dsznajder.es7-react-js-snippets",
+        "formulahendry.auto-close-tag",
+        "formulahendry.auto-rename-tag", 
+        "oderwat.indent-rainbow",
+        "ms-ceintl.vscode-language-pack-ja"
+			]
+		}
+	}, 
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite Dev Server",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh"
+}
