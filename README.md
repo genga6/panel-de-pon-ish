@@ -1,11 +1,11 @@
 # Panel de Pon-ish
 
-Just a thing I made for fun.  
-Built with React + TypeScript + Tailwind CSS — mostly to mess around and try stuff out.
+Just a small project I built for fun.  
+Created with React, TypeScript, and Tailwind CSS — mostly to experiment and try new things.
 
-It's kinda like *Panel de Pon* on the Super Famicom.  
-Swap blocks, match 3, they disappear.  
-The board slowly rises. If it hits the top, game over.
+It’s similar to *Panel de Pon* on the Super Famicom.  
+Swap blocks, match three of the same color, and they disappear.  
+The board gradually rises — if it reaches the top, it’s game over.
 
 Based on the original [Panel de Pon (Nintendo, SFC)](https://www.nintendo.com/jp/games/feature/nintendo-classics/s-2034_j/index.html)
 
