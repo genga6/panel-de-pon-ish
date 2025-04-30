@@ -1,124 +1,71 @@
 import React, { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
-const COLS = 6;
-const ROWS = 12;
-const INITIAL_EMPTY_ROWS = 6;
-const RISE_INTERVAL_MS = 3_000;
-const CELL_SIZE_REM = 2.25;
+import { COLS, ROWS, CELL_SIZE_REM, RISE_INTERVAL_MS, COLORS } from './gameConfig';
+import { Board, Cell, Pos } from './gameTypes';
+import { generateInitialBoard, detectMatches, applyGravity, cloneBoard } from './boardUtils';
 
-const COLORS = [
-  'bg-red-400', 
-  'bg-blue-400', 
-  'bg-yellow-400', 
-  'bg-green-400', 
-  'bg-purple-400'
-] as const;
-
-type Cell = number;
-type Board = Cell[][];
-type Pos = { r: number; c: number };
-
-const randomColor = (): Cell => Math.floor(Math.random() * COLORS.length) + 1;
-
-const createRandomRow = (): Cell[] => Array.from({ length: COLS }, () => randomColor());
-
-function initializeBoard(): Board {
-	return [
-    ...Array.from({ length: INITIAL_EMPTY_ROWS },  () => Array(COLS).fill(0)), 
-    ...Array.from({ length: ROWS - INITIAL_EMPTY_ROWS }, createRandomRow),
-  ];
-}
-
-const cloneBoard = (board: Board): Board =>	board.map(row => [...row]);
-
-
-function detectMatches(board: Board): Set<string> {
-	const matches = new Set<string>();
-	// horizontal
-	for (let r = 0; r < ROWS; r++) {
-		let count = 1;
-		for (let c = 1; c < COLS; c++) {
-			if (board[r][c] !== 0 && board[r][c] === board[r][c - 1]) {
-				count++;
-        const end = c === COLS - 1 || board[r][c] !== board[r][c + 1];
-        if (count >=3 && end) for (let k = 0; k < count; k++) matches.add(`${r},${c - k}`);
-			} else {
-				count = 1;
-			}
-		}
-  }
-  // vertical
-  for (let c = 0; c < COLS; c++) {
-    let count = 1;
-    for (let r = 1; r < ROWS; r++) {
-      if (board[r][c] !== 0 && board[r][c] === board[r - 1][c]) {
-        count++;
-        const end = r === ROWS - 1 || board[r][c] !== board[r + 1][c];
-        if (count >= 3 && end) for (let k = 0; k < count; k++) matches.add(`${r - k},${c}`);
-      } else {
-        count = 1;
-      }
-    }
-  }
-  return matches;
-}
-
-function applyGravity(board: Board): void {
-  for (let c = 0; c < COLS; c++) {
-    let writeRow = ROWS - 1;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (board[r][c] !== 0) {
-        if (writeRow !== r) {
-          board[writeRow][c] = board[r][c];
-          board[r][c] = 0;
-        }
-        writeRow--;
-      }
-    }
-  }
-}
-
-function resolveBoardInPlace(b: Board) {
-  let matches = detectMatches(b);
-  while (matches.size > 0) {
-    matches.forEach((key) => {
-      const [r, c] = key.split(',').map(Number);
-      b[r][c] = 0;
-    });
-    applyGravity(b);
-    matches = detectMatches(b);
-  }
-}
 
 const PanelDePonish: React.FC = () => {
-  const [board, setBoard] = useState<Board>(initializeBoard);
+  const [board, setBoard] = useState<Board>(() => generateInitialBoard());
   const [cursor, setCursor] = useState<Pos>({ r: ROWS - 1, c: 0 });
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const swapAndResolve = (p1: Pos, p2: Pos) => {
-    setBoard((prev) => {
-      const next = cloneBoard(prev);
-      [next[p1.r][p1.c], next[p2.r][p2.c]] = [next[p2.r][p2.c], next[p1.r][p1.c]];
-      resolveBoardInPlace(next);
-      return next;
-    });
-  };
+  const swapCells = useCallback((b: Board, p1: Pos, p2: Pos) => {
+    [b[p1.r][p1.c], b[p2.r][p2.c]] = [b[p2.r][p2.c], b[p1.r][p1.c]];
+  }, []);
 
-  const rise = () => {
+  const resolveBoardAnimated = useCallback((current: Board) => {
+    const matches = detectMatches(current);
+    if (matches.length === 0) return;
+
+    const next = cloneBoard(current);
+    matches.flat().forEach(([r, c]) => (next[r][c] = 0));
+    setBoard(cloneBoard(next));
+
+    setTimeout(() => {
+      applyGravity(next);
+      setBoard(cloneBoard(next));
+      resolveBoardAnimated(next);
+    }, 220);
+  }, []);
+
+  const dropIfPossible = (b: Board) => applyGravity(b);
+
+  const performSwap = useCallback(
+    (p1: Pos, p2: Pos) => {
+      setBoard((prev) => {
+        const next = cloneBoard(prev);
+        swapCells(next, p1, p2);
+        dropIfPossible(next);
+        return next;
+      });
+
+      setTimeout(() => 
+        setBoard((b) => {
+          resolveBoardAnimated(cloneBoard(b));
+          return b;
+        }), 
+      0);
+    }, 
+    [swapCells, resolveBoardAnimated]
+  );
+
+  const rise = useCallback(() => {
     setBoard((prev) => {
-			const next = [...prev.slice(1), createRandomRow()];
-      resolveBoardInPlace(next);
-      if (next[0].some((cell) => cell !== 0)) {
+			const next = [...prev.slice(1), Array.from({ length: COLS }, () => Math.floor(Math.random() * COLORS.length) + 1)];
+      resolveBoardAnimated(next);
+      if (next[0].some((x) => x !== 0)) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRunning(false);
       }
-      return next;
+      return cloneBoard(next);
     });
-  };
+  }, [resolveBoardAnimated]);
 
   const startGame = () => {
-    setBoard(initializeBoard());
+    setBoard(generateInitialBoard());
     setCursor({ r: ROWS - 1, c: 0 });
     setRunning(true);
   };
@@ -126,7 +73,7 @@ const PanelDePonish: React.FC = () => {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!running) return;
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' '].includes(e.keys)){
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' '].includes(e.key)){
         e.preventDefault();
       }
       switch (e.key) {
@@ -144,11 +91,11 @@ const PanelDePonish: React.FC = () => {
           break;
         case 'Enter':
         case ' ':
-          swapAndResolve(cursor, { r: cursor.r, c: cursor.c + 1 }); 
+          performSwap(cursor, { r: cursor.r, c: cursor.c + 1 }); 
           break;
       }
     }, 
-    [running, cursor]
+    [running, cursor, performSwap]
   );
 
   useEffect(() => {
@@ -163,7 +110,7 @@ const PanelDePonish: React.FC = () => {
       intervalRef.current = setInterval(rise, RISE_INTERVAL_MS);
       return () => intervalRef.current && clearInterval(intervalRef.current);
 		};
-  }, [running]);
+  }, [running, rise]);
 
   const handleCellClick = (r: number, c: number) => {
     if (!running) return;
@@ -179,6 +126,7 @@ const PanelDePonish: React.FC = () => {
 				className='grid bg-gray-900 p-px rounded-2xl shadow-2xl'
 				style={{ 
           gridTemplateColumns: `repeat(${COLS}, ${CELL_SIZE_REM}rem)`, 
+          gridAutoRows: `${CELL_SIZE_REM}rem`, 
           gap: '1px', 
         }}
 			>
@@ -186,13 +134,31 @@ const PanelDePonish: React.FC = () => {
           row.map((cell, c) => {
             const underCursor = r === cursor.r && (c === cursor.c || c === cursor.c + 1);
             return (
-              <button
-                key={`${r}-${c}`}
-                onClick={() => handleCellClick(r, Math.min(c, COLS - 2))}
-                className={`aspect-square w-full transition-transform active:scale-90 border border-black/20 ${
-                  cell ? COLORS[cell - 1] : 'bg-gray-800'
-                } ${underCursor ? 'ring-2 ring-yellow-300' : ''}`}
-              />
+              <AnimatePresence key={`${r}-${c}`}>
+                {cell !== 0 ? (
+                  <motion.button
+                    layout
+                    onClick={() => handleCellClick(r, Math.min(c, COLS - 2))}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0, transition: {duration: 0.2 } }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                    className={`
+                      aspect-square w-full transition-transform active:scale-90 border border-black/20 
+                      ${COLORS[cell - 1]} 
+                      ${underCursor ? 'ring-2 ring-yellow-300' : ''}
+                    `}
+                  />
+                ) : (
+                  <div 
+                  onClick={() => handleCellClick(r, Math.min(c, COLS - 2))}
+                  className={`
+                    "aspect=square w-full bg-gray-800/30 transition-transform
+                    ${underCursor ? 'ring-2 ring-yellow-300' : ''} 
+                  `}
+                  />
+                )}
+              </AnimatePresence>
             );
           })
 				)}
